@@ -44,7 +44,7 @@
  * services.
  *
  */
-
+//// 调用系统方法 os_linux.parker
 class Parker : public os::PlatformParker {
 private:
   volatile int _counter ;

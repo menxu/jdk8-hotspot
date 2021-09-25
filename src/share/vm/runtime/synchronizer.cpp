@@ -170,26 +170,26 @@ static volatile int MonitorPopulation = 0 ;      // # Extant -- in circulation
  * @param attempt_rebias
  */ 
 void ObjectSynchronizer::fast_enter(Handle obj, BasicLock* lock, bool attempt_rebias, TRAPS) {
-  // 开启偏向锁
+  //// 开启偏向锁
  if (UseBiasedLocking) {
-    // 不处于同步安全点
+    //// 不处于同步安全点
     if (!SafepointSynchronize::is_at_safepoint()) {
-      // 偏向锁的获取
+      //// 偏向锁的获取
       BiasedLocking::Condition cond = BiasedLocking::revoke_and_rebias(obj, attempt_rebias, THREAD);
       if (cond == BiasedLocking::BIAS_REVOKED_AND_REBIASED) {
         return;
       }
 
-      // 处于安全点
+      ////处于安全点
     } else {
-      // 如果执行CAS失败，表示当前存在多个线程竞争锁，当达到全局安全点（safepoint），获得偏向锁的线程被挂起，撤销偏向锁，并升级为轻量级，升级完成后被阻塞在安全点的线程继续执行同步代码块；
+      //// 如果执行CAS失败，表示当前存在多个线程竞争锁，当达到全局安全点（safepoint），获得偏向锁的线程被挂起，撤销偏向锁，并升级为轻量级，升级完成后被阻塞在安全点的线程继续执行同步代码块；
       assert(!attempt_rebias, "can not rebias toward VM thread");
       BiasedLocking::revoke_at_safepoint(obj);
     }
     assert(!obj->mark()->has_bias_pattern(), "biases should be revoked by now");
  }
 
-// 当关闭偏向锁功能，或多个线程竞争偏向锁导致偏向锁升级为轻量级锁，会尝试获取轻量级锁
+//// 当关闭偏向锁功能，或多个线程竞争偏向锁导致偏向锁升级为轻量级锁，会尝试获取轻量级锁
  slow_enter (obj, lock, THREAD) ;
 }
 
@@ -235,25 +235,25 @@ void ObjectSynchronizer::fast_exit(oop object, BasicLock* lock, TRAPS) {
 // We don't need to use fast path here, because it must have been
 // failed in the interpreter/compiler code.
 void ObjectSynchronizer::slow_enter(Handle obj, BasicLock* lock, TRAPS) {
-  // 获取对象头mark 
+  //// 获取对象头mark 
   markOop mark = obj->mark();
   assert(!mark->has_bias_pattern(), "should not see bias pattern here");
 
-  // 判断mark是否为无锁状态：mark的偏向锁标志位为 0，锁标志位为 01；
+  //// 判断mark是否为无锁状态：mark的偏向锁标志位为 0，锁标志位为 01；
   if (mark->is_neutral()) {
     // Anticipate successful CAS -- the ST of the displaced mark must
     // be visible <= the ST performed by the CAS.
     // 把mark保存到BasicLock对象的_displaced_header字段；
     lock->set_displaced_header(mark);
 
-    // 通过CAS尝试将Mark Word更新为指向BasicLock对象的指针，如果更新成功，表示竞争到锁，则执行同步代码
+    //// 通过CAS尝试将Mark Word更新为指向BasicLock对象的指针，如果更新成功，表示竞争到锁，则执行同步代码
     if (mark == (markOop) Atomic::cmpxchg_ptr(lock, obj()->mark_addr(), mark)) {
       TEVENT (slow_enter: release stacklock) ;
       return ;
     }
-    // Fall through to inflate() ...
+    //// Fall through to inflate() ...
   } 
-  // 如果当前mark处于加锁状态，且mark中的ptr指针指向当前线程的栈帧，则执行同步代码
+  //// 如果当前mark处于加锁状态，且mark中的ptr指针指向当前线程的栈帧，则执行同步代码
   else if (mark->has_locker() && THREAD->is_lock_owned((address)mark->locker())) {
     assert(lock != mark->locker(), "must not re-lock the same lock");
     assert(lock != (BasicLock*)obj->mark(), "don't relock with same BasicLock");
@@ -275,7 +275,7 @@ void ObjectSynchronizer::slow_enter(Handle obj, BasicLock* lock, TRAPS) {
   // and must not look locked either.
   lock->set_displaced_header(markOopDesc::unused_mark());
 
-  // 膨胀成重量级锁
+  //// 膨胀成重量级锁
   ObjectSynchronizer::inflate(THREAD, obj())->enter(THREAD);
 }
 

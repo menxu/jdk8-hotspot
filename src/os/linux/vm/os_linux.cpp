@@ -5807,7 +5807,7 @@ static void unpackTime(timespec* absTime, bool isAbsolute, jlong time) {
   assert(absTime->tv_nsec < NANOSECS_PER_SEC, "tv_nsec >= nanos_per_sec");
 }
 
-// park方法源码
+//// park方法源码  os pthread_mutex
 void Parker::park(bool isAbsolute, jlong time) {
   // Ideally we'd do something useful while spinning, such
   // as calling unpackTime().

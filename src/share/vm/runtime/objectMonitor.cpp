@@ -319,7 +319,7 @@ void ATTR ObjectMonitor::enter(TRAPS) {
   // and to reduce RTS->RTO cache line upgrades on SPARC and IA32 processors.
   Thread * const Self = THREAD ;
   void * cur ;
-
+  ////看当前持有锁的线程是否为空 直接获取锁，非公平锁
   cur = Atomic::cmpxchg_ptr (Self, &_owner, NULL) ;
   if (cur == NULL) {
      // Either ASSERT _recursions == 0 or explicitly set _recursions = 0.
@@ -328,7 +328,7 @@ void ATTR ObjectMonitor::enter(TRAPS) {
      // CONSIDER: set or assert OwnerIsThread == 1
      return ;
   }
-
+  ////重入
   if (cur == Self) {
      // TODO-FIXME: check for integer overflow!  BUGID 6557169.
      _recursions ++ ;
@@ -354,6 +354,7 @@ void ATTR ObjectMonitor::enter(TRAPS) {
   // transitions.  The following spin is strictly optional ...
   // Note that if we acquire the monitor from an initial spin
   // we forgo posting JVMTI events and firing DTRACE probes.
+  //// 再次自旋一下
   if (Knob_SpinEarly && TrySpin (Self) > 0) {
      assert (_owner == Self      , "invariant") ;
      assert (_recursions == 0    , "invariant") ;
@@ -401,7 +402,7 @@ void ATTR ObjectMonitor::enter(TRAPS) {
       jt->set_suspend_equivalent();
       // cleared by handle_special_suspend_equivalent_condition()
       // or java_suspend_self()
-
+      ////进入队列 获取锁 502
       EnterI (THREAD) ;
 
       if (!ExitSuspendEquivalent(jt)) break ;
@@ -542,8 +543,10 @@ void ATTR ObjectMonitor::EnterI (TRAPS) {
     // TODO: eliminate ObjectWaiter and enqueue either Threads or Events.
     //
 
+    ////将线程封装为node
     ObjectWaiter node(Self) ;
     Self->_ParkEvent->reset() ;
+    ////入队
     node._prev   = (ObjectWaiter *) 0xBAD ;
     node.TState  = ObjectWaiter::TS_CXQ ;
 
@@ -619,7 +622,7 @@ void ATTR ObjectMonitor::EnterI (TRAPS) {
            Atomic::cmpxchg_ptr (Self, &_Responsible, NULL) ;
         }
 
-        // park self
+        //// park self
         if (_Responsible == Self || (SyncFlags & 1)) {
             TEVENT (Inflated enter - park TIMED) ;
             Self->_ParkEvent->park ((jlong) RecheckInterval) ;
